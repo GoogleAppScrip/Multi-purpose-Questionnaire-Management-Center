@@ -95,7 +95,7 @@ function getUserName(userId) {
   if (userData) {
     const data = userData.getDataRange().getValues();
     for (let row of data) {
-      if (row[0] === userId && row[6] === "Active") return row[4] || row[1];
+      if (row[0] === userId) return row[4] || row[1];
     }
   }
   return "同行善友";

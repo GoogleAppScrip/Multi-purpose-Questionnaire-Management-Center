@@ -10,7 +10,7 @@ const log_sheet = ss.getSheetByName("紀錄資料");
 const cache = PropertiesService.getUserProperties(); // 現階段以 Session 記憶為主
 
 /**
- * LINE Webhook 入口
+ * LINE Webhook 入口  
  * 處理來自 LINE 平台的消息事件，並根據邏輯進行回覆
  * @param {Object} e - Apps Script 傳入的事件對象
  */
@@ -76,7 +76,25 @@ function handleFollow(event) {
  * 處理「取消好友 (Unfollow)」事件
  */
 function handleUnfollow(event) {
-  Log(`[DEBUG] handleUnfollow() TODO: 處理封鎖/刪除好友邏輯"`);
+  Log(`[DEBUG] handleUnfollow() 處理封鎖/刪除好友邏輯"`);
+
+  // 1. 取得使用者ID (userId)
+  const userId = event.source.userId;
+
+  // 2. 找到 "使用者資料" 裡面的 用戶編號, 將"帳號狀態" 將改成 Inactive
+  const userData = ss.getSheetByName("使用者資料");
+  if (userData) {
+    const data = userData.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === userId) {
+        userData.getRange(i + 1, 7).setValue("Inactive");
+        Log(`[INFO] handleUnfollow: 用戶 ${userId} ("${data[i][1]}") 已設為 Inactive`);
+        break;
+      }
+    }
+  } else {
+    Log(`[ERROR] handleUnfollow: 找不到 "使用者資料" 分頁`);
+  }
 }
 
 /**
@@ -118,7 +136,25 @@ function handleJoin(event) {
  * 處理「離開群組 (Leave)」事件
  */
 function handleLeave(event) {
-  Log(`[DEBUG] handleLeave() TODO: 處理機器人被踢出或群組廢止邏輯"`);
+  Log(`[DEBUG] handleLeave(): 處理離開群組邏輯"`);
+
+  // 1. 取得群組ID (groupId)
+  const groupId = event.source.groupId || event.source.roomId;
+
+  // 2. 找到 "使用者資料" 裡面的 "群組"(用戶編號), 將"帳號狀態" 將改成 Inactive
+  const userData = ss.getSheetByName("使用者資料");
+  if (userData) {
+    const data = userData.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === groupId) {
+        userData.getRange(i + 1, 7).setValue("Inactive");
+        Log(`[INFO] handleLeave: 群組/用戶 ${groupId} ("${data[i][1]}") 已設為 Inactive`);
+        break;
+      }
+    }
+  } else {
+    Log(`[ERROR] handleLeave: 找不到 "使用者資料" 分頁`);
+  }
 }
 
 
@@ -191,10 +227,11 @@ function processEngine(userId, userInput, session, depth = 1) {
     session.data["問卷名稱"] = session.confSheet;
     session.data["儲存分頁"] = session.resultSheet;
     session.data["USER_INPUT"] = project.matchedInput; // 已去關鍵字後的輸入
+    userInput =  session.data["USER_INPUT"];
     Log(`[INIT] Project: ${session.projectId}, Config: ${session.confSheet}, Result: ${session.resultSheet}`);
   }
 
-    Log(`Debug 2> userId: ${userId}, message: ${userInput}, session: ${JSON.stringify(session)}`);
+  Log(`[DEBUG] userId: ${userId}, message: ${userInput}, session: ${JSON.stringify(session)}`);
 
   let responseText = "";
   // 3. 獲取當前狀態之顯示內容與處理邏輯
@@ -227,6 +264,11 @@ function processEngine(userId, userInput, session, depth = 1) {
     targetSheet.insertRowBefore(2);
     targetSheet.getRange(2, 1, 1, dataRow.length).setValues([dataRow]);
     SpreadsheetApp.flush(); // 強制更新
+
+    // 5. 產生分頁網址並存入 Session 供後續渲染使用 (改為 gviz HTML 輸出格式，純網頁報表)
+    const spreadsheetUrl = ss.getUrl().replace('/edit', '');
+    session.data["分頁網址"] = `${spreadsheetUrl}/gviz/tq?tqx=out:html&gid=${targetSheet.getSheetId()}`;
+    Log(`[SAVE] 已產生 gviz 報表網址: ${session.data["分頁網址"]}`);
 
   } else {
     Log(`[EXEC] Handling Input & Process for State: ${session.currentState}`);
@@ -280,7 +322,7 @@ function processEngine(userId, userInput, session, depth = 1) {
 
   // 9. 最終更新 Session 並回傳渲染後的文本
   saveSession(userId, session);
-  Log(`Debug 3> userId: ${userId}, message: ${userInput}, session: ${JSON.stringify(session)}`);
+  Log(`[DEBUG] userId: ${userId}, message: ${userInput}, session: ${JSON.stringify(session)}`);
 
   if (session.undefine && session.undefine.length > 0)
     responseText = renderTemplate(responseText, session);
@@ -347,6 +389,9 @@ function checkProjectTrigger(userInput) {
     const projectName = projects[i][1];
     const resultSheet = projects[i][2];
     const description = projects[i][3];
+
+    // 如果 keyword 是空的, 則跳過
+    if (!keyword || String(keyword).trim() === "") continue;
 
     // 使用從試算表讀取的關鍵字（支援正則表達式）來測試使用者目前的輸入內容
     // 如果 userInput 匹配成功（例如輸入了「我的善行」觸發了「^我的善行」），則進入執行邏輯
@@ -498,7 +543,9 @@ function handleOutputConfig(config, session) {
       const outputMap = JSON.parse(outputTemplate);
       // 從 session.data[storageKey] 取得對應的輸出當作 Key
       const lookupKey = String(session.data[storageKey] || "").trim();
-      outputTemplate = outputMap[lookupKey] || outputMap["default"];
+      outputTemplate = outputMap.hasOwnProperty(lookupKey) ? outputMap[lookupKey] : outputMap["default"];
+
+      Log(`[DEBUG] handleOutputConfig outputMap: "${JSON.stringify(outputMap)}", lookupKey: "${lookupKey}", outputTemplate: "${outputTemplate}"`);
       
       if (outputTemplate === undefined) {
         Log(`[WARN] handleOutputConfig 在映射中找不到 Key: "${lookupKey}" 且無 default`);
