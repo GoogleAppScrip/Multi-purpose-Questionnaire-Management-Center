@@ -63,7 +63,7 @@ function handleFollow(event) {
   session.data["用戶狀態"] = profile.statusMessage || "";
 
   // 4. 觸發 "專案索引" 裡面的 "加入好友"之問卷
-  const responseText = processEngine(userId, "加入好友", session);
+  const responseText = processEngine(userId, "_加入好友_", session);
   
   if (responseText) {
     replyLINE(replyToken, responseText);
@@ -125,7 +125,7 @@ function handleJoin(event) {
   session.data["用戶圖像"] = summary.pictureUrl || "";
 
   // 4. 觸發 "專案索引" 裡面的 "加入群組"之問卷
-  const responseText = processEngine(groupId, "加入群組", session);
+  const responseText = processEngine(groupId, "_加入群組_", session);
   
   if (responseText) {
     replyLINE(replyToken, responseText);

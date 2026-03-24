@@ -63,7 +63,8 @@ function getProfile(userId) {
  */
 function getGroupSummary(groupId) {
   try {
-    Log(`[DEBUG] getGroupSummary() TODO: 實作 getGroupSummary API 呼叫"`);
+    Log(`[DEBUG] getGroupSummary() 實作 getGroupSummary API 呼叫"`);
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const url = "https://api.line.me/v2/bot/group/" + groupId + "/summary";
     const accessToken = ss.getSheetByName("參數設定").getRange("B2").getValue();
@@ -71,7 +72,12 @@ function getGroupSummary(groupId) {
       "headers": { "Authorization": "Bearer " + accessToken },
       "method": "get"
     });
-    return JSON.parse(response.getContentText());
+
+    const info = JSON.parse(response.getContentText());
+    Log(`[DEBUG] group information: ${info}`);
+
+    return info;
+
   } catch (err) {
     Log(`[ERROR] getGroupSummary 失敗: ${err.message}`);
     return null;
