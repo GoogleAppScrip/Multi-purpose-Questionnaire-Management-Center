@@ -132,17 +132,26 @@ function getWeekNumber(d) {
 
 /**
  * 計算最近一次指定星期幾的日期 (YYYYMMDD)
+ * 解決時區偏移導致 getDay() 與 setDate() 可能產生 1 天誤差的問題
  * @param {Date} targetDate 基礎日期
  * @param {Number} targetDay 星期索引 (1=Mon, 2=Tue... 6=Sat, 0=Sun)
  */
 function getRecentDay(targetDate, targetDay) {
-  let d = new Date(targetDate);
-  let currentDay = d.getDay(); // 0(Sun) - 6(Sat)
+  // 1. 強制擷取台北時間的 年、月、日 與 週次編號 (u: 1=Mon...7=Sun)
+  let y = Number(Utilities.formatDate(targetDate, "Asia/Taipei", "yyyy"));
+  let m = Number(Utilities.formatDate(targetDate, "Asia/Taipei", "MM"));
+  let d = Number(Utilities.formatDate(targetDate, "Asia/Taipei", "dd"));
+  let u = Number(Utilities.formatDate(targetDate, "Asia/Taipei", "u"));
   
-  // 計算差距
+  let currentDay = u % 7; // 轉為 0=Sun, 1=Mon... 6=Sat
   let diff = currentDay - targetDay;
   if (diff < 0) diff += 7;
   
-  d.setDate(d.getDate() - diff);
-  return Utilities.formatDate(d, "Asia/Taipei", "yyyyMMdd");
+  // 2. 使用 UTC 時間作為「中立容器」來進行加減天數，避免任何本地時區偏移干擾
+  // 我們建立一個該日期中午 12 點的 UTC 對象
+  let utcDate = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  utcDate.setUTCDate(utcDate.getUTCDate() - diff);
+  
+  // 3. 直接從 UTC 對象格式化輸出
+  return Utilities.formatDate(utcDate, "UTC", "yyyyMMdd");
 }

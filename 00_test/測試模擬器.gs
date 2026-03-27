@@ -1,3 +1,8 @@
+function test2() {
+  const now = new Date();
+  Logger.log(getRecentDay(now,1));
+}
+
 /**
  * 測試模擬器 - 用於在不連結 LINE 的情況下測試邏輯
  */

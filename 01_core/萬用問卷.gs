@@ -195,7 +195,6 @@ function handleMessage(event) {
  * @returns {String} render後的系統回覆訊息
  */
 function processEngine(userId, userInput, session, depth = 1) {
-    Log(`Debug 1> userId: ${userId}, message: ${userInput}, session: ${JSON.stringify(session)}`);
   // 1. 安全閥：遞迴深度限制，防止配置錯誤導致死循環
   if (depth >= 15) {
     return "系統遞迴執行超過上限，請檢查問卷邏輯是否有死循環。";
